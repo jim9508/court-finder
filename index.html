@@ -127,6 +127,12 @@ a.line-btn{background:var(--line-green);color:var(--line-ink);padding:10px 16px;
 details.help{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
 summary{cursor:pointer;font-weight:500}
 details.help ol{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}
+/* booking links */
+.venues{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.venue{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.venue h3{margin:0;font-size:16px}
+.venue .meta{font-size:13px;color:var(--muted);margin:0}
+.courts{display:flex;flex-wrap:wrap;gap:8px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -202,6 +208,30 @@ details.help ol{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--mute
         <li>把每一行貼成一個選項，設定截止時間後送出。</li>
       </ol>
     </details>
+  </section>
+
+  <section id="booking">
+    <div class="sec-head"><h2>預約連結</h2></div>
+    <div class="venues">
+      <div class="venue">
+        <h3>閃電匹克館</h3>
+        <p class="meta">3 面場，每面場各自預約，進去選日期就會看到時段。</p>
+        <div class="courts">
+          <a class="btn court-btn" target="_blank" rel="noopener" href="https://tinybot.cc/inazuma8888/product/%e9%96%83%e9%9b%bb%e5%8c%b9%e5%85%8b%e7%90%83/">1號場</a>
+          <a class="btn court-btn" target="_blank" rel="noopener" href="https://tinybot.cc/inazuma8888/product/2%e8%99%9f%e5%a0%b4/">2號場</a>
+          <a class="btn court-btn" target="_blank" rel="noopener" href="https://tinybot.cc/inazuma8888/product/3%e8%99%9f%e5%a0%b4/">3號場</a>
+          <a class="btn court-btn" target="_blank" rel="noopener" href="https://tinybot.cc/inazuma8888/">官網</a>
+        </div>
+      </div>
+      <div class="venue">
+        <h3>P9 複合式運動競技館</h3>
+        <p class="meta">3 面匹克球場・NT$480/hr 起・新竹縣寶山鄉福德街 13-1 號。要用 Google 帳號登入才能預約。</p>
+        <div class="courts">
+          <a class="btn court-btn" target="_blank" rel="noopener" href="https://p9arena.linkcourt.app/reserve">預約頁</a>
+          <a class="btn court-btn" target="_blank" rel="noopener" href="https://p9arena.linkcourt.app/">官網</a>
+        </div>
+      </div>
+    </div>
   </section>
 </div>
 
