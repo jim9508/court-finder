@@ -1,0 +1,8 @@
+{
+  "name": "court-finder",
+  "private": true,
+  "description": "p9.mjs 在本機用 playwright-core 驅動已安裝的 Chrome；scrape.mjs 不需要任何套件",
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

@@ -1,6 +1,6 @@
 // 抓兩家匹克球館未來 N 天的空場時段，輸出 data/slots.json
 // 需要 Node 18+（內建 fetch），沒有其他套件。
-import { writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 
 const DAYS = Number(process.env.DAYS || 14);   // 抓幾天
 const DELAY_MS = 1500;                          // 每次請求間隔，別對球館網站太兇
@@ -74,23 +74,38 @@ async function scrapeInazuma(dates) {
     }
     courts.push({ name: c.name, url: c.url, days });
   }
-  return { id: INAZUMA.id, name: INAZUMA.name, ok: true, courts };
+  return { id: INAZUMA.id, name: INAZUMA.name, url: 'https://tinybot.cc/inazuma8888/', ok: true, updated_at: new Date().toISOString(), courts };
 }
 
-// P9 的時段 API（/api/v2/courts/slots?date=）需要登入後的 Authorization header，
-// 目前先標示為無法自動抓取。
-function p9Placeholder() {
-  return {
-    id: 'p9', name: 'P9 競技館', ok: false,
-    note: '需要 Google 登入才看得到時段，請到預約頁查看',
-    url: 'https://p9arena.linkcourt.app/',
-    courts: [],
-  };
+// P9 API 回傳（/api/v2/courts/slots?date=）：00:00–05:59 不列（P9 半夜也開放租借）。
+// 只留匹克球 1～3 號場、開放中的整點；不帶 API 裡的訂位人姓名、電話等欄位。
+export function parseP9Day(json, minHour = 6) {
+  const courts = [];
+  for (const c of json.courts || []) {
+    const m = /^匹克球(\d+)號場$/.exec(c.name);
+    if (!m || !c.is_active) continue;
+    const slots = (json.slots_by_court?.[c.id] || [])
+      .filter((s) => s.status === 'available' && s.hour >= minHour)
+      .map((s) => ({ t: `${String(s.hour).padStart(2, '0')}:00`, price: s.price }));
+    courts.push({ id: c.id, name: `${m[1]}號場`, slots });
+  }
+  return courts;
+}
+
+// P9 的資料由本機的 p9.mjs 每小時抓好、推到 repo 的 data/p9.json，這裡只負責併進來。
+async function loadP9() {
+  const base = { id: 'p9', name: 'P9 競技館', url: 'https://p9arena.linkcourt.app/' };
+  try {
+    const p = JSON.parse(await readFile('data/p9.json', 'utf8'));
+    return { ...base, ok: !!p.ok, updated_at: p.updated_at || null, error: p.error || null, courts: p.courts || [] };
+  } catch {
+    return { ...base, ok: false, updated_at: null, error: 'no_data', courts: [] };
+  }
 }
 
 async function main() {
   const dates = nextDates(DAYS);
-  const venues = [await scrapeInazuma(dates), p9Placeholder()];
+  const venues = [await scrapeInazuma(dates), await loadP9()];
   const out = { updated_at: new Date().toISOString(), timezone: TZ, dates, venues };
   await mkdir('data', { recursive: true });
   await writeFile('data/slots.json', JSON.stringify(out, null, 2) + '\n');

@@ -46,8 +46,9 @@ h2{font-size:18px;margin:0}
 a{color:var(--court)}
 
 /* freshness */
-.fresh{font-size:13px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
-.fresh.stale{color:var(--warn-ink);background:var(--warn-bg);border-radius:6px;padding:1px 8px}
+.fresh-row{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fresh-row a{color:inherit}
+.fresh-row .stale{color:var(--warn-ink);background:var(--warn-bg);border-radius:6px;padding:1px 8px}
 
 /* date strip */
 .days{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
@@ -76,9 +77,9 @@ span.cell{display:grid;place-items:center;color:var(--line)}
 span.cell.err{color:var(--danger)}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
-.p9{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.p9 .txt{flex:1;min-width:200px;font-size:14px}
-.p9 strong{display:block}
+.grid thead tr.vrow th{font-weight:700;color:var(--fg);font-size:14px;padding-bottom:0;border-bottom:none}
+.grid .vstart{border-left:2px solid var(--line)}
+.cell small{font-size:11px;font-weight:500}
 .empty{padding:20px;text-align:center;color:var(--muted);font-size:14px}
 
 a.btn,button{font:inherit;cursor:pointer;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
@@ -129,30 +130,27 @@ details.help ol{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--mute
   <header>
     <span class="kicker">Pickleball · 約場</span>
     <h1>查空場、列時段、丟 LINE 投票</h1>
-    <p class="lead">點表格裡的空檔加進候選清單，再一鍵分享到 LINE 群組讓球友選。</p>
+    <p class="lead">閃電匹克館和 P9 競技館的空檔每小時自動更新。點表格裡的空檔加進候選清單，再一鍵分享到 LINE 群組讓球友選。</p>
   </header>
 
   <section>
-    <div class="sec-head"><span class="step">1</span><h2>閃電匹克館空檔</h2><span class="fresh" id="fresh">載入中…</span></div>
+    <div class="sec-head"><span class="step">1</span><h2>兩家空檔</h2></div>
+    <div class="fresh-row" id="fresh"><span class="note">載入中…</span></div>
     <div class="days" id="days" role="group" aria-label="選日期"></div>
     <div class="grid-wrap" id="grid-wrap"><div class="empty">正在讀取空檔資料…</div></div>
     <div class="legend">
-      <span><i style="background:var(--court-soft)"></i>空檔，點一下加入</span>
+      <span><i style="background:var(--court-soft)"></i>空檔，點一下加入（P9 顯示每小時價格）</span>
       <span><i style="background:var(--ball)"></i>已在候選清單</span>
       <span>— 已被訂走或未開放</span>
     </div>
-    <div class="p9">
-      <div class="txt"><strong>P9 複合式運動競技館</strong>
-        <span class="note">3 面匹克球場・NT$480/hr 起。要用 Google 登入才看得到時段，沒辦法自動抓，請到官網查完用下方「手動加入」。</span></div>
-      <a class="btn court-btn" target="_blank" rel="noopener" href="https://p9arena.linkcourt.app/">開 P9 預約頁</a>
-    </div>
+    <p class="note">約每小時更新一次，下單前請到球館頁面再確認。點表頭的場地名稱可以直接開預約頁。</p>
   </section>
 
   <section>
     <div class="sec-head"><span class="step">2</span><h2>候選時段</h2></div>
     <ul class="slots" id="slots"></ul>
     <details class="manual" id="manual">
-      <summary>＋ 手動加入時段（P9 或其他）</summary>
+      <summary>＋ 手動加入時段</summary>
       <form id="slot-form">
         <label class="c3">場館
           <select id="f-venue">
@@ -225,35 +223,58 @@ let slots=load(KEY); if(!Array.isArray(slots)) slots=[];
 let data=null, day=load(DKEY);
 
 /* ---------- 1. 空檔表 ---------- */
-function freeSlots(court,ymd){
-  const v=court.days[ymd]; if(!Array.isArray(v)) return v;
-  const now=taipeiNow();
-  return ymd===now.ymd ? v.filter(t=>t>now.hm) : v;
+const VKEY={inazuma:'閃電',p9:'P9'};
+const SHORT={inazuma:'閃電',p9:'P9'};
+const STALE_MIN=180;
+const ago=t=>{const m=Math.round((Date.now()-new Date(t))/60000);return m<1?'剛剛':m<60?`${m} 分鐘前`:`${Math.floor(m/60)} 小時前`};
+const isStale=t=>!t||(Date.now()-new Date(t))/60000>STALE_MIN;
+
+// 每一欄＝一面場：[{vid, key, venue, court}]
+function columns(){
+  if(!data) return [];
+  return data.venues.flatMap(v=>(v.courts||[]).map(c=>({vid:v.id,key:VKEY[v.id]||v.name,venue:v,court:c})));
 }
-function venue(){return data && data.venues.find(v=>v.id==='inazuma')}
-function isPicked(court,ymd,t){
+// 某欄某天的空檔：[{t, price?}]；抓取失敗回傳 null；今天已過的時段不列
+function freeSlots(col,ymd){
+  const v=col.court.days[ymd]; if(!Array.isArray(v)) return v===undefined?[]:null;
+  const now=taipeiNow();
+  const list=v.map(x=>typeof x==='string'?{t:x}:x);
+  return ymd===now.ymd ? list.filter(x=>x.t>now.hm) : list;
+}
+function isPicked(key,court,ymd,t){
   const m=toMin(t);
-  return slots.some(s=>s.venue==='閃電'&&s.court===court&&s.date===ymd&&toMin(s.start)<=m&&m<toMin(s.start)+s.hours*60);
+  return slots.some(s=>s.venue===key&&s.court===court&&s.date===ymd&&toMin(s.start)<=m&&m<toMin(s.start)+s.hours*60);
 }
 
 function renderFresh(){
-  if(!data){return}
-  const t=new Date(data.updated_at), mins=Math.round((Date.now()-t)/60000);
-  const hm=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(t);
-  const ago=mins<1?'剛剛':mins<60?`${mins} 分鐘前`:`${Math.floor(mins/60)} 小時前`;
-  const el=$('fresh'); el.textContent=`最後更新 ${hm}（${ago}）`;
-  el.classList.toggle('stale',mins>180);
-  el.title=mins>180?'資料超過 3 小時沒更新，下單前請到球館頁面再確認':'約每小時更新一次，下單前仍以球館頁面為準';
+  if(!data) return;
+  const box=$('fresh'); box.innerHTML='';
+  const fmt=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+  data.venues.forEach(v=>{
+    const el=document.createElement('span');
+    const t=v.updated_at||data.updated_at;
+    if(v.id==='p9'&&!v.ok){
+      el.className='stale';
+      el.textContent=v.error==='needs_login'
+        ? `P9 需要重新登入${v.updated_at?`，資料停在 ${fmt.format(new Date(v.updated_at))}`:''}`
+        : v.error==='no_data' ? 'P9 還沒有資料' : `P9 這次沒抓到${v.updated_at?`，資料停在 ${fmt.format(new Date(v.updated_at))}`:''}`;
+    } else {
+      el.textContent=`${SHORT[v.id]||v.name} ${t?fmt.format(new Date(t))+'（'+ago(t)+'）':'沒有資料'}`;
+      if(isStale(t)) el.className='stale';
+    }
+    el.title='下單前請到球館頁面再確認';
+    box.appendChild(el);
+  });
 }
 
 function renderDays(){
-  const v=venue(), box=$('days'); box.innerHTML='';
-  if(!v) return;
+  const cols=columns(), box=$('days'); box.innerHTML='';
+  if(!data) return;
   const today=taipeiNow().ymd;
   const dates=data.dates.filter(d=>d>=today);
   if(!dates.includes(day)) day=dates[0];
   dates.forEach(ymd=>{
-    const n=v.courts.reduce((a,c)=>a+((freeSlots(c,ymd)||[]).length),0);
+    const n=cols.reduce((a,c)=>a+((freeSlots(c,ymd)||[]).length),0);
     const d=parseDate(ymd), b=document.createElement('button');
     b.type='button'; b.className='day'; b.setAttribute('aria-pressed',ymd===day);
     b.innerHTML='<span class="w"></span><span class="d"></span><span class="n"></span>';
@@ -266,33 +287,46 @@ function renderDays(){
   const cur=box.querySelector('[aria-pressed="true"]'); if(cur) cur.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 
+function link(href,text){const a=document.createElement('a');a.href=href;a.target='_blank';a.rel='noopener';a.textContent=text;return a}
+
 function renderGrid(){
-  const v=venue(), wrap=$('grid-wrap');
-  if(!v){wrap.innerHTML='<div class="empty">沒有閃電匹克館的資料。</div>';return}
-  const per=v.courts.map(c=>freeSlots(c,day));
-  const times=[...new Set(per.flatMap(x=>x||[]))].sort();
+  const cols=columns(), wrap=$('grid-wrap');
+  if(!cols.length){wrap.innerHTML='<div class="empty">還沒有空檔資料。</div>';return}
+  const per=cols.map(c=>freeSlots(c,day));
+  const times=[...new Set(per.flatMap(x=>(x||[]).map(s=>s.t)))].sort();
   if(!times.length){
-    const anyErr=per.some(x=>x==null);
-    wrap.innerHTML=`<div class="empty">${anyErr?'這天的資料抓取失敗，請直接到球館頁面查看。':'這天三面場都沒有空檔了。'}</div>`;
+    wrap.innerHTML=`<div class="empty">${per.some(x=>x==null)?'這天有場館抓取失敗，請直接到球館頁面查看。':'這天兩家都沒有空檔了。'}</div>`;
     return;
   }
   const t=document.createElement('table'); t.className='grid';
-  const head=document.createElement('tr'); head.innerHTML='<th class="t" scope="col"><span class="note">時間</span></th>';
-  v.courts.forEach(c=>{const th=document.createElement('th');th.scope='col';const a=document.createElement('a');a.href=c.url;a.target='_blank';a.rel='noopener';a.textContent=c.name;th.appendChild(a);head.appendChild(th)});
-  const thead=document.createElement('thead');thead.appendChild(head);t.appendChild(thead);
+  const thead=document.createElement('thead');
+  // 第一列：場館名稱（跨欄）
+  const vr=document.createElement('tr'); vr.className='vrow'; vr.appendChild(document.createElement('th'));
+  data.venues.filter(v=>(v.courts||[]).length).forEach(v=>{
+    const th=document.createElement('th'); th.colSpan=v.courts.length; th.className='vstart'; th.scope='colgroup';
+    th.appendChild(link(v.url||LINKS[VKEY[v.id]],v.name)); vr.appendChild(th);
+  });
+  // 第二列：場地
+  const cr=document.createElement('tr'); cr.innerHTML='<th class="t" scope="col"><span class="note">時間</span></th>';
+  cols.forEach((c,i)=>{const th=document.createElement('th');th.scope='col';if(i===0||cols[i-1].vid!==c.vid)th.className='vstart';th.appendChild(link(c.court.url||c.venue.url,c.court.name));cr.appendChild(th)});
+  thead.append(vr,cr); t.appendChild(thead);
   const tb=document.createElement('tbody');
   times.forEach(tm=>{
     const tr=document.createElement('tr');
     const th=document.createElement('th');th.className='t';th.scope='row';th.textContent=tm;tr.appendChild(th);
-    v.courts.forEach((c,i)=>{
-      const td=document.createElement('td'); const list=per[i];
+    cols.forEach((c,i)=>{
+      const td=document.createElement('td'); if(i===0||cols[i-1].vid!==c.vid) td.className='vstart';
+      const list=per[i], hit=list&&list.find(s=>s.t===tm);
       if(list==null){const s=document.createElement('span');s.className='cell err';s.textContent='?';s.title='這天抓取失敗';td.appendChild(s)}
-      else if(list.includes(tm)){
+      else if(hit){
         const b=document.createElement('button');b.type='button';
-        const picked=isPicked(c.name,day,tm);
-        b.className='cell'+(picked?' picked':'');b.textContent=picked?'✓':'空';
-        b.setAttribute('aria-label',`${c.name} ${tm} ${picked?'已加入，點一下移除':'空檔，點一下加入候選'}`);
-        b.onclick=()=>togglePick(c.name,day,tm);
+        const picked=isPicked(c.key,c.court.name,day,tm);
+        b.className='cell'+(picked?' picked':'');
+        if(picked) b.textContent='✓';
+        else if(hit.price){const sm=document.createElement('small');sm.textContent='$'+hit.price;b.appendChild(sm)}
+        else b.textContent='空';
+        b.setAttribute('aria-label',`${c.venue.name} ${c.court.name} ${tm}${hit.price?' NT$'+hit.price:''} ${picked?'已加入，點一下移除':'空檔，點一下加入候選'}`);
+        b.onclick=()=>togglePick(c.key,c.court.name,day,tm);
         td.appendChild(b);
       } else {const s=document.createElement('span');s.className='cell';s.textContent='—';td.appendChild(s)}
       tr.appendChild(td);
@@ -303,18 +337,18 @@ function renderGrid(){
 }
 
 // 點空檔：加入 1 小時；和同場地相鄰的時段自動接成一段。再點一次就移除那一小時。
-function togglePick(court,ymd,tm){
-  const m=toMin(tm);
-  const i=slots.findIndex(s=>s.venue==='閃電'&&s.court===court&&s.date===ymd&&toMin(s.start)<=m&&m<toMin(s.start)+s.hours*60);
+function togglePick(key,court,ymd,tm){
+  const m=toMin(tm), label=`${key} ${court} ${tm}`;
+  const i=slots.findIndex(s=>s.venue===key&&s.court===court&&s.date===ymd&&toMin(s.start)<=m&&m<toMin(s.start)+s.hours*60);
   if(i>=0){
     const s=slots[i], a=toMin(s.start), b=a+s.hours*60;
     slots.splice(i,1);
     if(m>a) slots.push({...s,hours:(m-a)/60});
     if(m+60<b) slots.push({...s,start:fromMin(m+60),hours:(b-m-60)/60});
-    toast('已移除 '+court+' '+tm);
+    toast('已移除 '+label);
   } else {
-    slots.push({venue:'閃電',court,date:ymd,start:tm,hours:1});
-    mergeSlots(); toast('已加入 '+court+' '+tm);
+    slots.push({venue:key,court,date:ymd,start:tm,hours:1});
+    mergeSlots(); toast('已加入 '+label);
   }
   save(KEY,slots); render();
 }
@@ -351,7 +385,7 @@ function renderSlots(){
   });
   if(!slots.length){
     const li=document.createElement('li');li.className='note';
-    li.textContent='還沒有時段。點上面表格的「空」加入，或用「手動加入」填 P9 的時段。';ul.appendChild(li);
+    li.textContent='還沒有時段。點上面表格的空檔加入，或用「手動加入」。';ul.appendChild(li);
   }
 }
 

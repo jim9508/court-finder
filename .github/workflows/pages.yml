@@ -6,6 +6,8 @@ on:
   workflow_dispatch: {}
   push:
     branches: [main]
+    # 本機每小時推 P9 資料時不另外觸發，等下一輪排程（:17）一起部署
+    paths-ignore: ['data/p9.json']
 permissions:
   contents: read
   pages: write
