@@ -80,20 +80,26 @@ async function fetchDay(tok, ymd) {
   return parseP9Day(await res.json());
 }
 
+// 一次查三天（P9 的 API 一次回全部場地），批次之間隔 1 秒，整體約 5 秒
 async function scrape() {
   const tok = await getToken();
   const dates = nextDates(DAYS);
+  const results = {};
+  for (let i = 0; i < dates.length; i += 3) {
+    const batch = dates.slice(i, i + 3);
+    await Promise.all(batch.map(async (ymd) => {
+      try { results[ymd] = await fetchDay(tok, ymd); }
+      catch (e) { if (e instanceof NeedLogin) throw e; results[ymd] = null; console.error(`P9 ${ymd}: ${e.message}`); }
+    }));
+    if (i + 3 < dates.length) await sleep(1000);
+  }
   const byName = new Map();
   for (const ymd of dates) {
-    let day = null;
-    try { day = await fetchDay(tok, ymd); }
-    catch (e) { if (e instanceof NeedLogin) throw e; console.error(`P9 ${ymd}: ${e.message}`); }
-    for (const c of day || []) {
+    for (const c of results[ymd] || []) {
       if (!byName.has(c.name)) byName.set(c.name, { name: c.name, url: `${ORIGIN}/reserve?date=${ymd}`, days: {} });
       byName.get(c.name).days[ymd] = c.slots;
     }
-    if (!day) for (const c of byName.values()) c.days[ymd] = null;
-    await sleep(DELAY_MS);
+    if (!results[ymd]) for (const c of byName.values()) c.days[ymd] = null;
   }
   const courts = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant', { numeric: true }));
   return { ok: true, updated_at: new Date().toISOString(), dates, courts };

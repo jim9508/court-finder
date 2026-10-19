@@ -63,17 +63,17 @@ async function fetchInazumaDay(productId, ymd) {
   return parseInazumaSlots(html);
 }
 
+// 三面場同時抓（每面場自己仍間隔 1.5 秒），整體約 20 秒
 async function scrapeInazuma(dates) {
-  const courts = [];
-  for (const c of INAZUMA.courts) {
+  const courts = await Promise.all(INAZUMA.courts.map(async (c) => {
     const days = {};
     for (const ymd of dates) {
       try { days[ymd] = await fetchInazumaDay(c.productId, ymd); }
       catch (e) { days[ymd] = null; console.error(`${INAZUMA.name} ${c.name} ${ymd}: ${e.message}`); }
       await sleep(DELAY_MS);
     }
-    courts.push({ name: c.name, url: c.url, days });
-  }
+    return { name: c.name, url: c.url, days };
+  }));
   return { id: INAZUMA.id, name: INAZUMA.name, url: 'https://tinybot.cc/inazuma8888/', ok: true, updated_at: new Date().toISOString(), courts };
 }
 

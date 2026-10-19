@@ -1,11 +1,11 @@
 name: scrape and deploy
 on:
-  # 主要觸發：Mac 每到整點抓完 P9 推上來（data/p9.json）就跑，抓閃電並部署，約整點過 2～3 分更新完
+  # 主要觸發：Mac 每 15 分鐘抓完 P9 推上來（data/p9.json）就跑，抓閃電並部署
   push:
     branches: [main]
-  # 備援：Mac 沒開時，台北時間 07:30～00:30 每小時一次；Mac 50 分鐘內推過就跳過，避免重複抓閃電
+  # 備援：Mac 沒開時，台北時間 07:07～00:52 每 15 分鐘一次；Mac 20 分鐘內推過就跳過，避免重複抓閃電
   schedule:
-    - cron: '30 0-16,23 * * *'
+    - cron: '7,22,37,52 0-16,23 * * *'
   workflow_dispatch: {}
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
           last=$(git log -1 --format=%ct -- data/p9.json || echo 0)
           age=$(( $(date +%s) - ${last:-0} ))
           echo "p9.json last pushed ${age}s ago"
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "$age" -lt 3000 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$age" -lt 1200 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
       - if: steps.check.outputs.skip != 'true'
         uses: actions/setup-node@v5
         with: { node-version: 22 }
