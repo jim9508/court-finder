@@ -1,13 +1,12 @@
 name: scrape and deploy
 on:
-  schedule:
-    # 台北時間 07:17～00:17 每小時一次（UTC 23、0–16 點），半夜不抓
-    - cron: '17 0-16,23 * * *'
-  workflow_dispatch: {}
+  # 主要觸發：Mac 每到整點抓完 P9 推上來（data/p9.json）就跑，抓閃電並部署，約整點過 2～3 分更新完
   push:
     branches: [main]
-    # 本機每小時推 P9 資料時不另外觸發，等下一輪排程（:17）一起部署
-    paths-ignore: ['data/p9.json']
+  # 備援：Mac 沒開時，台北時間 07:30～00:30 每小時一次；Mac 50 分鐘內推過就跳過，避免重複抓閃電
+  schedule:
+    - cron: '30 0-16,23 * * *'
+  workflow_dispatch: {}
 permissions:
   contents: read
   pages: write
@@ -24,16 +23,30 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+        with: { fetch-depth: 50 }
+      - name: skip fallback run if the Mac pushed recently
+        id: check
+        run: |
+          last=$(git log -1 --format=%ct -- data/p9.json || echo 0)
+          age=$(( $(date +%s) - ${last:-0} ))
+          echo "p9.json last pushed ${age}s ago"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$age" -lt 3000 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.check.outputs.skip != 'true'
+        uses: actions/setup-node@v5
         with: { node-version: 22 }
-      - run: node test.mjs
-      - run: node scrape.mjs
+      - if: steps.check.outputs.skip != 'true'
+        run: node test.mjs
+      - if: steps.check.outputs.skip != 'true'
+        run: node scrape.mjs
       - name: assemble site
+        if: steps.check.outputs.skip != 'true'
         run: |
           mkdir -p _site/data
           cp index.html _site/
           cp data/slots.json _site/data/
-      - uses: actions/upload-pages-artifact@v4
+      - if: steps.check.outputs.skip != 'true'
+        uses: actions/upload-pages-artifact@v4
         with: { path: _site }
       - id: deploy
+        if: steps.check.outputs.skip != 'true'
         uses: actions/deploy-pages@v4
