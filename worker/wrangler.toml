@@ -1,0 +1,16 @@
+name = "court-finder-refresh"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://jim9508.github.io"
+GH_REPO = "jim9508/court-finder"
+
+# KV namespace "court-finder-refresh"
+[[kv_namespaces]]
+binding = "KV"
+id = "54a5eb3b74874357a66d238e9194775d"
+
+# 每分鐘檢查：Mac 2 分鐘內沒接手就改叫 GitHub Actions
+[triggers]
+crons = ["* * * * *"]

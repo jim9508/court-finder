@@ -6,8 +6,9 @@
 //   node p9.mjs login      第一次：開一般 Chrome 視窗，用專用帳號登入 P9 後關掉視窗
 //   node p9.mjs            排程用：抓資料 + git push
 //   node p9.mjs --no-push  只抓不推
+//   node p9.mjs --poll     每分鐘：問 Worker 有沒有人按「立即更新」，有就照常抓 + push
 import { chromium } from 'playwright-core';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, open, stat, unlink } from 'node:fs/promises';
 import { execFileSync, spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -23,6 +24,9 @@ const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const DAYS = Number(process.env.DAYS || 14);
 const DELAY_MS = 1500;
 const UA = 'court-finder (personal use; hourly)';
+// Worker 網址和 Mac 輪詢金鑰：{ "worker_url": "...", "mac_key": "..." }，只存在本機
+const CONFIG = join(dirname(PROFILE), 'config.json');
+const LOCK = join(dirname(PROFILE), 'run.lock');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 class NeedLogin extends Error {}
@@ -117,8 +121,15 @@ async function login() {
   console.log(`登入成功，token 到 ${new Date(tokenExp(tok)).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}`);
 }
 
-async function main() {
-  if (process.argv[2] === 'login') return login();
+// 同一時間只跑一份（整點排程和「立即更新」可能撞在一起，Chrome 設定檔也不能同時開兩個）
+async function withLock(fn) {
+  try { if (Date.now() - (await stat(LOCK)).mtimeMs > 10 * 60 * 1000) await unlink(LOCK); } catch {}
+  let fh;
+  try { fh = await open(LOCK, 'wx'); } catch { console.log(`${new Date().toISOString()} 另一份正在跑，略過`); return; }
+  try { await fn(); } finally { await fh.close(); await unlink(LOCK).catch(() => {}); }
+}
+
+async function run() {
   let out;
   try {
     out = await scrape();
@@ -134,6 +145,27 @@ async function main() {
   const n = (out.courts || []).reduce((a, c) => a + Object.values(c.days).flat().filter(Boolean).length, 0);
   console.log(`${new Date().toISOString()} p9 ok=${out.ok} ${n} open slots`);
   if (!process.argv.includes('--no-push')) push();
+}
+
+// 沒有請求時安靜結束，不寫 log
+async function poll() {
+  let cfg;
+  try { cfg = JSON.parse(await readFile(CONFIG, 'utf8')); } catch { return; }
+  const call = (path, method = 'GET') => fetch(cfg.worker_url + path, {
+    method, headers: { authorization: `Bearer ${cfg.mac_key}` }, signal: AbortSignal.timeout(10000),
+  });
+  const res = await call('/pending');
+  if (!res.ok) throw new Error(`Worker /pending ${res.status}`);
+  if (!(await res.json()).pending) return;
+  if (!(await call('/claim', 'POST')).ok) return;
+  console.log(`${new Date().toISOString()} 有人按了立即更新`);
+  await withLock(run);
+}
+
+async function main() {
+  if (process.argv[2] === 'login') return login();
+  if (process.argv.includes('--poll')) return poll();
+  await withLock(run);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e); process.exit(1); });

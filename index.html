@@ -50,6 +50,11 @@ a{color:var(--court)}
 .fresh-row a{color:inherit}
 .fresh-row .stale{color:var(--warn-ink);background:var(--warn-bg);border-radius:6px;padding:1px 8px}
 
+.refresh-row{display:flex;gap:8px 12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.refresh{padding:6px 12px;font-size:13px;border-color:var(--court);color:var(--court);font-weight:500}
+.refresh:disabled{opacity:.5;cursor:default}
+#refresh-msg:empty{display:none}
+
 /* date strip */
 .days{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
 .day{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;
@@ -135,7 +140,11 @@ details.help ol{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--mute
 
   <section>
     <div class="sec-head"><span class="step">1</span><h2>兩家空檔</h2></div>
-    <div class="fresh-row" id="fresh"><span class="note">載入中…</span></div>
+    <div class="refresh-row">
+      <div class="fresh-row" id="fresh"><span class="note">載入中…</span></div>
+      <button class="ghost refresh" id="refresh" type="button" hidden>立即更新</button>
+    </div>
+    <p class="note" id="refresh-msg" aria-live="polite"></p>
     <div class="days" id="days" role="group" aria-label="選日期"></div>
     <div class="grid-wrap" id="grid-wrap"><div class="empty">正在讀取空檔資料…</div></div>
     <div class="legend">
@@ -440,10 +449,66 @@ $('copy-opts').onclick=()=>{
   copy(t,'投票選項已複製（一行一個）',$('msg'));setTimeout(renderMsg,4000);
 };
 
+/* ---------- 立即更新 ---------- */
+// Cloudflare Worker：記下請求，叫 Mac 抓 P9（Mac 沒回應就改叫 GitHub 只抓閃電）；全站每 10 分鐘最多一次
+const WORKER_URL='https://court-finder-refresh.court-finder-refresh.workers.dev';
+const hm=t=>new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(t));
+let waitFor=0, pollTimer=null, enableTimer=null;
+
+async function loadData(){
+  const r=await fetch('data/slots.json?ts='+Date.now(),{cache:'no-store'});
+  if(!r.ok) throw new Error(r.status);
+  data=await r.json(); renderFresh(); render();
+}
+async function workerStatus(){
+  const r=await fetch(WORKER_URL+'/status',{cache:'no-store'}); return r.json();
+}
+function applyStatus(st){
+  const btn=$('refresh'); btn.hidden=false; clearTimeout(enableTimer);
+  const now=Date.now(), busy=st.state==='pending'||st.state.startsWith('running');
+  if(busy && st.requested_at && now-st.requested_at<8*60000 && !(data && new Date(data.updated_at)>=st.requested_at)){
+    startWaiting(st.requested_at, st.state); return;
+  }
+  if(now<st.next_allowed_at){
+    btn.disabled=true; $('refresh-msg').textContent=`剛更新過，${hm(st.next_allowed_at)} 後可以再按`;
+    enableTimer=setTimeout(()=>{btn.disabled=false;$('refresh-msg').textContent=''},st.next_allowed_at-now);
+  } else { btn.disabled=false; $('refresh-msg').textContent=''; }
+}
+function waitingText(state){
+  return state==='running:github' ? '電腦沒回應，先更新閃電，P9 維持上次的資料…' : state==='running:mac' ? '正在抓兩家的空檔，約 2～3 分鐘…' : '已送出，等電腦接手…';
+}
+function startWaiting(since,state){
+  waitFor=since; $('refresh').disabled=true; $('refresh-msg').textContent=waitingText(state);
+  clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    try{
+      const st=await workerStatus();
+      await loadData();
+      if(new Date(data.updated_at)>=waitFor){
+        clearInterval(pollTimer); waitFor=0; toast('空檔已更新'); applyStatus(st); return;
+      }
+      if(Date.now()-since>8*60000){ clearInterval(pollTimer); $('refresh-msg').textContent='這次更新比較慢，請過幾分鐘重新整理頁面。'; return; }
+      $('refresh-msg').textContent=waitingText(st.state);
+    }catch(e){}
+  },15000);
+}
+$('refresh').onclick=async()=>{
+  const btn=$('refresh'); btn.disabled=true;
+  try{
+    const r=await fetch(WORKER_URL+'/refresh',{method:'POST'});
+    const st=await r.json();
+    if(r.status===202) startWaiting(st.requested_at,st.state);
+    else applyStatus(st);
+  }catch(e){ btn.disabled=false; $('refresh-msg').textContent='更新請求沒送出去，請稍後再試。'; }
+};
+
 render();
-fetch('data/slots.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
-  .then(j=>{data=j;renderFresh();render();setInterval(renderFresh,60000)})
-  .catch(()=>{$('fresh').textContent='讀不到空檔資料';$('grid-wrap').innerHTML='<div class="empty">空檔資料暫時讀不到，請直接點球館頁面查看：<br><a href="https://tinybot.cc/inazuma8888/" target="_blank" rel="noopener">閃電匹克館</a></div>'});
+loadData().then(()=>{
+  setInterval(renderFresh,60000);
+  if(WORKER_URL) workerStatus().then(applyStatus).catch(()=>{});
+}).catch(()=>{$('fresh').textContent='讀不到空檔資料';$('grid-wrap').innerHTML='<div class="empty">空檔資料暫時讀不到，請直接點球館頁面查看：<br><a href="https://tinybot.cc/inazuma8888/" target="_blank" rel="noopener">閃電匹克館</a>、<a href="https://p9arena.linkcourt.app/" target="_blank" rel="noopener">P9 競技館</a></div>'});
+// 從 LINE 切回來時順便看有沒有新資料
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && data && !waitFor) loadData().catch(()=>{}); });
 </script>
 </body>
 </html>

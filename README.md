@@ -9,5 +9,10 @@
   - 第一次：`npm install`，再 `node p9.mjs login`，用專用 Google 帳號登入 P9 後關掉視窗
   - 排程：`~/Library/LaunchAgents/com.jim9508.court-finder-p9.plist`，台北時間 07:00～00:00 每到整點跑，log 在 `~/Library/Logs/court-finder-p9.log`
   - 約場板顯示「P9 需要重新登入」時，重跑 `node p9.mjs login`
+- 「立即更新」按鈕：`worker/` 是 Cloudflare Worker（court-finder-refresh），記下請求並限制全站每 10 分鐘一次
+  - Mac 每分鐘跑 `node p9.mjs --poll`（`~/Library/LaunchAgents/com.jim9508.court-finder-poll.plist`）問 Worker，有請求就抓 P9 並推上來，推送會觸發部署
+  - Mac 2 分鐘內沒接手，Worker 的每分鐘 cron 改用 `GH_TOKEN` 觸發 Actions，只更新閃電
+  - Worker 密鑰：`MAC_KEY`（本機存在 `~/Library/Application Support/court-finder/config.json`）、`GH_TOKEN`（fine-grained，只有此 repo 的 Actions 寫入權限）
+  - 部署：`cd worker && npm install && npx wrangler deploy`；測試：`node worker/test.mjs`
 
 本機測試：`node test.mjs && node scrape.mjs`，再用 `python3 -m http.server` 開 `index.html`。
