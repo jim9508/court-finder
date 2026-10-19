@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>匹克球約場板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one narrow column like a scorecard — open slots (check), candidate slots (pick), LINE message (send) */
+:root{
+  --bg:#eef3f1; --surface:#ffffff; --fg:#14262b; --muted:#5b6f73; --line:#cfdcd8;
+  --court:#1d6b72; --court-ink:#ffffff; --court-soft:#d6ebe8; --ball:#d7e83a; --ball-ink:#1b2a06;
+  --line-green:#06c755; --line-ink:#ffffff; --danger:#b23a2b; --warn-bg:#fdf3d6; --warn-ink:#6b4b00;
+  --f-display:"Barlow Condensed","Noto Sans TC",system-ui,sans-serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --r:10px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1a1c; --surface:#16262a; --fg:#e6efed; --muted:#9db0b3; --line:#2a3f43;
+  --court:#4fb3b9; --court-ink:#062226; --court-soft:#1d3a3e; --ball:#d7e83a; --ball-ink:#1b2a06;
+  --line-green:#06c755; --line-ink:#ffffff; --danger:#ff8a78; --warn-bg:#3a3014; --warn-ink:#f3d58a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1a1c; --surface:#16262a; --fg:#e6efed; --muted:#9db0b3; --line:#2a3f43;
+  --court:#4fb3b9; --court-ink:#062226; --court-soft:#1d3a3e; --ball:#d7e83a; --ball-ink:#1b2a06;
+  --line-green:#06c755; --line-ink:#ffffff; --danger:#ff8a78; --warn-bg:#3a3014; --warn-ink:#f3d58a; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
+[hidden]{display:none!important}
+.wrap{max-width:640px;margin:0 auto;padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-direction:column;gap:4px}
+.kicker{font-family:var(--f-display);font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--court);font-size:13px}
+h1{font-size:26px;line-height:1.2;margin:0;text-wrap:balance}
+.lead{margin:0;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:12px}
+.sec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.step{font-family:var(--f-display);font-weight:700;font-size:15px;background:var(--ball);color:var(--ball-ink);
+  border-radius:999px;min-width:26px;height:26px;display:inline-grid;place-items:center;flex:none}
+h2{font-size:18px;margin:0}
+.note{font-size:13px;color:var(--muted);margin:0}
+a{color:var(--court)}
+
+/* freshness */
+.fresh{font-size:13px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.fresh.stale{color:var(--warn-ink);background:var(--warn-bg);border-radius:6px;padding:1px 8px}
+
+/* date strip */
+.days{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.day{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;
+  padding:6px 8px;min-width:54px;display:flex;flex-direction:column;align-items:center;line-height:1.1;font:inherit;cursor:pointer}
+.day .d{font-family:var(--f-display);font-weight:700;font-size:20px}
+.day .w{font-size:12px;color:var(--muted)}
+.day .n{font-size:11px;font-variant-numeric:tabular-nums;color:var(--court);font-weight:700;margin-top:2px}
+.day .n.zero{color:var(--muted);font-weight:400}
+.day[aria-pressed="true"]{background:var(--court);border-color:var(--court);color:var(--court-ink)}
+.day[aria-pressed="true"] .w,.day[aria-pressed="true"] .n{color:var(--court-ink)}
+
+/* availability grid */
+.grid-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow-x:auto}
+table.grid{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.grid th,.grid td{padding:4px;text-align:center;border-bottom:1px solid var(--line)}
+.grid tr:last-child td{border-bottom:none}
+.grid thead th{font-size:13px;font-weight:500;color:var(--muted);padding-block:8px}
+.grid thead th a{color:inherit}
+.grid th.t{font-family:var(--f-display);font-weight:600;font-size:17px;width:64px;color:var(--fg)}
+.cell{width:100%;min-height:34px;border-radius:6px;font:inherit;font-size:13px;border:none}
+button.cell{cursor:pointer;background:var(--court-soft);color:var(--court);font-weight:700}
+button.cell:hover{background:var(--court);color:var(--court-ink)}
+button.cell.picked{background:var(--ball);color:var(--ball-ink)}
+span.cell{display:grid;place-items:center;color:var(--line)}
+span.cell.err{color:var(--danger)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+.p9{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.p9 .txt{flex:1;min-width:200px;font-size:14px}
+.p9 strong{display:block}
+.empty{padding:20px;text-align:center;color:var(--muted);font-size:14px}
+
+a.btn,button{font:inherit;cursor:pointer;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+a.court-btn{border:1.5px solid var(--court);color:var(--court);padding:6px 12px;font-weight:500;font-size:14px}
+a.court-btn:hover{background:var(--court);color:var(--court-ink)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--ball);outline-offset:2px}
+
+/* form */
+form{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);letter-spacing:.04em;min-width:0}
+.c3{grid-column:span 3}.c2{grid-column:span 2}.c6{grid-column:span 6}
+@media (max-width:460px){.c3,.c2{grid-column:span 3}.c2.wide{grid-column:span 6}}
+input,select{font:inherit;font-size:15px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+.primary{background:var(--court);color:var(--court-ink);border:none;padding:10px 14px;font-weight:700}
+.ghost{background:none;border:1px solid var(--line);color:var(--fg);padding:8px 12px;font-size:14px}
+details.manual{background:none;border:none;padding:0}
+details.manual>summary{font-size:14px;color:var(--court);cursor:pointer}
+details.manual>form{margin-top:10px}
+
+/* slots */
+.slots{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.slot{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.date-chip{font-family:var(--f-display);font-weight:700;text-align:center;line-height:1;background:var(--bg);border-radius:8px;padding:6px 8px;min-width:46px}
+.date-chip .d{font-size:22px;display:block}.date-chip .w{font-size:12px;color:var(--muted);font-family:var(--f-body);font-weight:500}
+.slot-main{min-width:0}
+.slot-time{font-family:var(--f-display);font-weight:600;font-size:19px;font-variant-numeric:tabular-nums}
+.slot-venue{font-size:13px;color:var(--muted)}
+.hrs{display:flex;gap:2px}
+.hrs button{background:none;border:1px solid var(--line);color:var(--fg);width:28px;height:28px;font-size:16px;padding:0}
+.del{background:none;border:none;color:var(--muted);font-size:20px;padding:4px 8px}
+.del:hover{color:var(--danger)}
+.slot-end{display:flex;align-items:center;gap:4px}
+
+/* message */
+.msg-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.msg-box pre{margin:0;padding:14px;white-space:pre-wrap;word-break:break-word;font-family:var(--f-body);font-size:14px;max-height:320px;overflow:auto}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+a.line-btn{background:var(--line-green);color:var(--line-ink);padding:10px 16px;font-weight:700}
+.toast{font-size:13px;color:var(--court);min-height:1.2em}
+details.help{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+summary{cursor:pointer;font-weight:500}
+details.help ol{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="kicker">Pickleball · 約場</span>
+    <h1>查空場、列時段、丟 LINE 投票</h1>
+    <p class="lead">點表格裡的空檔加進候選清單，再一鍵分享到 LINE 群組讓球友選。</p>
+  </header>
+
+  <section>
+    <div class="sec-head"><span class="step">1</span><h2>閃電匹克館空檔</h2><span class="fresh" id="fresh">載入中…</span></div>
+    <div class="days" id="days" role="group" aria-label="選日期"></div>
+    <div class="grid-wrap" id="grid-wrap"><div class="empty">正在讀取空檔資料…</div></div>
+    <div class="legend">
+      <span><i style="background:var(--court-soft)"></i>空檔，點一下加入</span>
+      <span><i style="background:var(--ball)"></i>已在候選清單</span>
+      <span>— 已被訂走或未開放</span>
+    </div>
+    <div class="p9">
+      <div class="txt"><strong>P9 複合式運動競技館</strong>
+        <span class="note">3 面匹克球場・NT$480/hr 起。要用 Google 登入才看得到時段，沒辦法自動抓，請到官網查完用下方「手動加入」。</span></div>
+      <a class="btn court-btn" target="_blank" rel="noopener" href="https://p9arena.linkcourt.app/">開 P9 預約頁</a>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="step">2</span><h2>候選時段</h2></div>
+    <ul class="slots" id="slots"></ul>
+    <details class="manual" id="manual">
+      <summary>＋ 手動加入時段（P9 或其他）</summary>
+      <form id="slot-form">
+        <label class="c3">場館
+          <select id="f-venue">
+            <option value="P9">P9 競技館</option>
+            <option value="閃電">閃電匹克館</option>
+          </select>
+        </label>
+        <label class="c3">場地（選填）
+          <input id="f-court" placeholder="例：A 場">
+        </label>
+        <label class="c2 wide">日期<input id="f-date" type="date" required></label>
+        <label class="c2">開始<input id="f-start" type="time" step="1800" value="19:00" required></label>
+        <label class="c2">時數
+          <select id="f-hours"><option>1</option><option selected>2</option><option>3</option></select>
+        </label>
+        <div class="c6"><button class="primary" type="submit" id="f-add">＋ 加入時段</button></div>
+      </form>
+    </details>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="step">3</span><h2>發到 LINE 投票</h2></div>
+    <form id="msg-form" style="grid-template-columns:1fr 1fr">
+      <label style="grid-column:span 2">標題<input id="m-title" value="這週打匹克球，哪個時段可以？"></label>
+      <label>回覆截止<input id="m-deadline" placeholder="例：週三晚上"></label>
+      <label>揪團人<input id="m-host" placeholder="你的暱稱"></label>
+    </form>
+    <div class="msg-box"><pre id="msg"></pre></div>
+    <div class="actions">
+      <a class="btn line-btn" id="line-share" target="_blank" rel="noopener" href="#">分享到 LINE</a>
+      <button class="ghost" id="copy-msg" type="button">複製訊息</button>
+      <button class="ghost" id="copy-opts" type="button">複製投票選項</button>
+    </div>
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <details class="help">
+      <summary>想用 LINE 群組內建的「投票」？</summary>
+      <ol>
+        <li>按「複製投票選項」，每個時段一行。</li>
+        <li>在 LINE 群組點「＋」→「投票」→ 建立投票，勾選「允許複選」。</li>
+        <li>把每一行貼成一個選項，設定截止時間後送出。</li>
+      </ol>
+    </details>
+  </section>
+</div>
+
+<script>
+const WD=['日','一','二','三','四','五','六'];
+const LINKS={'閃電':'https://tinybot.cc/inazuma8888/','P9':'https://p9arena.linkcourt.app/'};
+const VENUE_FULL={'閃電':'閃電匹克館','P9':'P9 競技館'};
+const KEY='pb-slots-v2', MKEY='pb-msg-v1', DKEY='pb-day-v1';
+const $=id=>document.getElementById(id);
+
+function load(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function parseDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
+function toMin(t){const [h,m]=t.split(':').map(Number);return h*60+m}
+function fromMin(n){return String(Math.floor(n/60)%24).padStart(2,'0')+':'+String(n%60).padStart(2,'0')}
+function endTime(start,h){return fromMin(toMin(start)+h*60)}
+function label(s){const d=parseDate(s.date);return `${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]}) ${s.start}–${endTime(s.start,s.hours)}`}
+function venueText(s){return VENUE_FULL[s.venue]+(s.court?' '+s.court:'')}
+
+// 台北現在時間
+function taipeiNow(){
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'})
+    .formatToParts(new Date()).map(x=>[x.type,x.value]));
+  return {ymd:`${p.year}-${p.month}-${p.day}`,hm:`${p.hour}:${p.minute}`};
+}
+
+let slots=load(KEY); if(!Array.isArray(slots)) slots=[];
+let data=null, day=load(DKEY);
+
+/* ---------- 1. 空檔表 ---------- */
+function freeSlots(court,ymd){
+  const v=court.days[ymd]; if(!Array.isArray(v)) return v;
+  const now=taipeiNow();
+  return ymd===now.ymd ? v.filter(t=>t>now.hm) : v;
+}
+function venue(){return data && data.venues.find(v=>v.id==='inazuma')}
+function isPicked(court,ymd,t){
+  const m=toMin(t);
+  return slots.some(s=>s.venue==='閃電'&&s.court===court&&s.date===ymd&&toMin(s.start)<=m&&m<toMin(s.start)+s.hours*60);
+}
+
+function renderFresh(){
+  if(!data){return}
+  const t=new Date(data.updated_at), mins=Math.round((Date.now()-t)/60000);
+  const hm=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(t);
+  const ago=mins<1?'剛剛':mins<60?`${mins} 分鐘前`:`${Math.floor(mins/60)} 小時前`;
+  const el=$('fresh'); el.textContent=`最後更新 ${hm}（${ago}）`;
+  el.classList.toggle('stale',mins>180);
+  el.title=mins>180?'資料超過 3 小時沒更新，下單前請到球館頁面再確認':'約每小時更新一次，下單前仍以球館頁面為準';
+}
+
+function renderDays(){
+  const v=venue(), box=$('days'); box.innerHTML='';
+  if(!v) return;
+  const today=taipeiNow().ymd;
+  const dates=data.dates.filter(d=>d>=today);
+  if(!dates.includes(day)) day=dates[0];
+  dates.forEach(ymd=>{
+    const n=v.courts.reduce((a,c)=>a+((freeSlots(c,ymd)||[]).length),0);
+    const d=parseDate(ymd), b=document.createElement('button');
+    b.type='button'; b.className='day'; b.setAttribute('aria-pressed',ymd===day);
+    b.innerHTML='<span class="w"></span><span class="d"></span><span class="n"></span>';
+    b.querySelector('.w').textContent=ymd===today?'今天':'週'+WD[d.getDay()];
+    b.querySelector('.d').textContent=`${d.getMonth()+1}/${d.getDate()}`;
+    const nn=b.querySelector('.n'); nn.textContent=n?`${n} 空`:'客滿'; nn.classList.toggle('zero',!n);
+    b.onclick=()=>{day=ymd;save(DKEY,day);renderDays();renderGrid()};
+    box.appendChild(b);
+  });
+  const cur=box.querySelector('[aria-pressed="true"]'); if(cur) cur.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+
+function renderGrid(){
+  const v=venue(), wrap=$('grid-wrap');
+  if(!v){wrap.innerHTML='<div class="empty">沒有閃電匹克館的資料。</div>';return}
+  const per=v.courts.map(c=>freeSlots(c,day));
+  const times=[...new Set(per.flatMap(x=>x||[]))].sort();
+  if(!times.length){
+    const anyErr=per.some(x=>x==null);
+    wrap.innerHTML=`<div class="empty">${anyErr?'這天的資料抓取失敗，請直接到球館頁面查看。':'這天三面場都沒有空檔了。'}</div>`;
+    return;
+  }
+  const t=document.createElement('table'); t.className='grid';
+  const head=document.createElement('tr'); head.innerHTML='<th class="t" scope="col"><span class="note">時間</span></th>';
+  v.courts.forEach(c=>{const th=document.createElement('th');th.scope='col';const a=document.createElement('a');a.href=c.url;a.target='_blank';a.rel='noopener';a.textContent=c.name;th.appendChild(a);head.appendChild(th)});
+  const thead=document.createElement('thead');thead.appendChild(head);t.appendChild(thead);
+  const tb=document.createElement('tbody');
+  times.forEach(tm=>{
+    const tr=document.createElement('tr');
+    const th=document.createElement('th');th.className='t';th.scope='row';th.textContent=tm;tr.appendChild(th);
+    v.courts.forEach((c,i)=>{
+      const td=document.createElement('td'); const list=per[i];
+      if(list==null){const s=document.createElement('span');s.className='cell err';s.textContent='?';s.title='這天抓取失敗';td.appendChild(s)}
+      else if(list.includes(tm)){
+        const b=document.createElement('button');b.type='button';
+        const picked=isPicked(c.name,day,tm);
+        b.className='cell'+(picked?' picked':'');b.textContent=picked?'✓':'空';
+        b.setAttribute('aria-label',`${c.name} ${tm} ${picked?'已加入，點一下移除':'空檔，點一下加入候選'}`);
+        b.onclick=()=>togglePick(c.name,day,tm);
+        td.appendChild(b);
+      } else {const s=document.createElement('span');s.className='cell';s.textContent='—';td.appendChild(s)}
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); wrap.innerHTML=''; wrap.appendChild(t);
+}
+
+// 點空檔：加入 1 小時；和同場地相鄰的時段自動接成一段。再點一次就移除那一小時。
+function togglePick(court,ymd,tm){
+  const m=toMin(tm);
+  const i=slots.findIndex(s=>s.venue==='閃電'&&s.court===court&&s.date===ymd&&toMin(s.start)<=m&&m<toMin(s.start)+s.hours*60);
+  if(i>=0){
+    const s=slots[i], a=toMin(s.start), b=a+s.hours*60;
+    slots.splice(i,1);
+    if(m>a) slots.push({...s,hours:(m-a)/60});
+    if(m+60<b) slots.push({...s,start:fromMin(m+60),hours:(b-m-60)/60});
+    toast('已移除 '+court+' '+tm);
+  } else {
+    slots.push({venue:'閃電',court,date:ymd,start:tm,hours:1});
+    mergeSlots(); toast('已加入 '+court+' '+tm);
+  }
+  save(KEY,slots); render();
+}
+function mergeSlots(){
+  sortSlots();
+  for(let i=slots.length-1;i>0;i--){
+    const p=slots[i-1], s=slots[i];
+    if(p.venue===s.venue&&p.court===s.court&&p.date===s.date&&toMin(p.start)+p.hours*60===toMin(s.start)){p.hours+=s.hours;slots.splice(i,1)}
+  }
+}
+
+/* ---------- 2. 候選清單 ---------- */
+function sortSlots(){slots.sort((a,b)=>(a.date+a.start+a.venue+a.court).localeCompare(b.date+b.start+b.venue+b.court))}
+
+function renderSlots(){
+  sortSlots();
+  const ul=$('slots');ul.innerHTML='';
+  slots.forEach((s,i)=>{
+    const d=parseDate(s.date);
+    const li=document.createElement('li');li.className='slot';
+    li.innerHTML=`<div class="date-chip"><span class="d"></span><span class="w"></span></div>
+      <div class="slot-main"><div class="slot-time"></div><div class="slot-venue"></div></div>
+      <div class="slot-end"><div class="hrs"><button type="button" class="minus" aria-label="少一小時">−</button><button type="button" class="plus" aria-label="多一小時">＋</button></div>
+      <button class="del" type="button" aria-label="刪除這個時段">×</button></div>`;
+    li.querySelector('.d').textContent=`${d.getMonth()+1}/${d.getDate()}`;
+    li.querySelector('.w').textContent='週'+WD[d.getDay()];
+    li.querySelector('.slot-time').textContent=`${s.start}–${endTime(s.start,s.hours)}`;
+    li.querySelector('.slot-venue').textContent=venueText(s)+`・${s.hours} 小時`;
+    li.querySelector('.minus').disabled=s.hours<=1;
+    li.querySelector('.minus').onclick=()=>{if(s.hours>1){s.hours--;save(KEY,slots);render()}};
+    li.querySelector('.plus').onclick=()=>{s.hours++;mergeSlots();save(KEY,slots);render()};
+    li.querySelector('.del').onclick=()=>{slots.splice(i,1);save(KEY,slots);render()};
+    ul.appendChild(li);
+  });
+  if(!slots.length){
+    const li=document.createElement('li');li.className='note';
+    li.textContent='還沒有時段。點上面表格的「空」加入，或用「手動加入」填 P9 的時段。';ul.appendChild(li);
+  }
+}
+
+/* ---------- 3. LINE 訊息 ---------- */
+function buildMsg(){
+  const title=$('m-title').value.trim()||'打匹克球時段調查';
+  const lines=[`🏓 ${title}`,''];
+  slots.forEach((s,i)=>lines.push(`${i+1}. ${label(s)}｜${venueText(s)}`));
+  if(!slots.length)lines.push('（尚未加入時段）');
+  lines.push('','回覆可以的編號，例如「1、3」');
+  const dl=$('m-deadline').value.trim();if(dl)lines.push(`請在 ${dl} 前回覆`);
+  const used=[...new Set(slots.map(s=>s.venue))];
+  if(used.length){lines.push('','場地預約：');used.forEach(v=>lines.push(`${VENUE_FULL[v]} ${LINKS[v]}`))}
+  const host=$('m-host').value.trim();if(host)lines.push('',`— ${host}`);
+  return lines.join('\n');
+}
+function buildOpts(){
+  return slots.map(s=>{const d=parseDate(s.date);
+    return `${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]}) ${s.start}-${endTime(s.start,s.hours)} ${s.venue}${s.court?s.court.replace('號場',''):''}`}).join('\n');
+}
+function renderMsg(){
+  const t=buildMsg();$('msg').textContent=t;
+  $('line-share').href='https://line.me/R/share?text='+encodeURIComponent(t);
+}
+
+function render(){renderSlots();renderMsg();if(data){renderDays();renderGrid()}}
+
+$('f-date').value=taipeiNow().ymd;
+$('slot-form').addEventListener('submit',e=>{
+  e.preventDefault();
+  slots.push({venue:$('f-venue').value,court:$('f-court').value.trim(),date:$('f-date').value,start:$('f-start').value,hours:Number($('f-hours').value)});
+  mergeSlots();save(KEY,slots);render();toast('已加入時段');
+});
+$('msg-form').addEventListener('submit',e=>e.preventDefault());
+const m=load(MKEY)||{};
+['title','deadline','host'].forEach(k=>{if(m[k]!=null)$('m-'+k).value=m[k]});
+['m-title','m-deadline','m-host'].forEach(id=>$(id).addEventListener('input',()=>{
+  save(MKEY,{title:$('m-title').value,deadline:$('m-deadline').value,host:$('m-host').value});renderMsg();
+}));
+
+let tt;function toast(s){$('toast').textContent=s;clearTimeout(tt);tt=setTimeout(()=>$('toast').textContent='',2500)}
+function copy(text,done,el){
+  navigator.clipboard.writeText(text).then(()=>toast(done)).catch(()=>{
+    const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);
+    toast('已選取文字，請長按複製');
+  });
+}
+$('copy-msg').onclick=()=>copy(buildMsg(),'訊息已複製，可以貼到 LINE 了',$('msg'));
+$('copy-opts').onclick=()=>{
+  if(!slots.length){toast('先加入至少一個時段');return}
+  const t=buildOpts();$('msg').textContent=t;
+  copy(t,'投票選項已複製（一行一個）',$('msg'));setTimeout(renderMsg,4000);
+};
+
+render();
+fetch('data/slots.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
+  .then(j=>{data=j;renderFresh();render();setInterval(renderFresh,60000)})
+  .catch(()=>{$('fresh').textContent='讀不到空檔資料';$('grid-wrap').innerHTML='<div class="empty">空檔資料暫時讀不到，請直接點球館頁面查看：<br><a href="https://tinybot.cc/inazuma8888/" target="_blank" rel="noopener">閃電匹克館</a></div>'});
+</script>
+</body>
+</html>

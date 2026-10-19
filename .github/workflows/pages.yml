@@ -1,0 +1,37 @@
+name: scrape and deploy
+on:
+  schedule:
+    # 台北時間 07:17～00:17 每小時一次（UTC 23、0–16 點），半夜不抓
+    - cron: '17 0-16,23 * * *'
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - run: node test.mjs
+      - run: node scrape.mjs
+      - name: assemble site
+        run: |
+          mkdir -p _site/data
+          cp index.html _site/
+          cp data/slots.json _site/data/
+      - uses: actions/upload-pages-artifact@v4
+        with: { path: _site }
+      - id: deploy
+        uses: actions/deploy-pages@v4
