@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 50 }
@@ -45,8 +45,15 @@ jobs:
           cp index.html _site/
           cp data/slots.json _site/data/
       - if: steps.check.outputs.skip != 'true'
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with: { path: _site }
+      # GitHub 偶爾發布失敗（找不到剛上傳的檔案），等 30 秒再試一次；兩次都失敗才算失敗
       - id: deploy
         if: steps.check.outputs.skip != 'true'
-        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - if: steps.deploy.outcome == 'failure'
+        run: sleep 30
+      - id: deploy_retry
+        if: steps.deploy.outcome == 'failure'
+        uses: actions/deploy-pages@v5
