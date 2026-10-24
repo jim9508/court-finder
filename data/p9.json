@@ -1,6 +1,6 @@
 {
-  "ok": false,
-  "updated_at": "2026-10-24T09:15:11.524Z",
+  "ok": true,
+  "updated_at": "2026-10-24T09:45:20.240Z",
   "dates": [
     "2026-10-24",
     "2026-10-25",
@@ -600,16 +600,7 @@
       "name": "2號場",
       "url": "https://p9arena.linkcourt.app/reserve?date=2026-10-24",
       "days": {
-        "2026-10-24": [
-          {
-            "t": "22:00",
-            "price": 880
-          },
-          {
-            "t": "23:00",
-            "price": 880
-          }
-        ],
+        "2026-10-24": [],
         "2026-10-25": [
           {
             "t": "06:00",
@@ -1752,8 +1743,5 @@
         ]
       }
     }
-  ],
-  "error": "needs_login",
-  "error_detail": "60 秒內沒拿到 token（最後在 p9arena.linkcourt.app）",
-  "checked_at": "2026-10-24T09:31:07.642Z"
+  ]
 }
