@@ -1,5 +1,5 @@
 {
-  "ok": true,
+  "ok": false,
   "updated_at": "2026-10-24T09:15:11.524Z",
   "dates": [
     "2026-10-24",
@@ -1752,5 +1752,8 @@
         ]
       }
     }
-  ]
+  ],
+  "error": "needs_login",
+  "error_detail": "60 秒內沒拿到 token（最後在 p9arena.linkcourt.app）",
+  "checked_at": "2026-10-24T09:31:07.642Z"
 }
