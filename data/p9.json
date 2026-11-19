@@ -1,5 +1,5 @@
 {
-  "ok": true,
+  "ok": false,
   "updated_at": "2026-11-19T13:33:50.997Z",
   "dates": [
     "2026-11-19",
@@ -1876,5 +1876,8 @@
         ]
       }
     }
-  ]
+  ],
+  "error": "error",
+  "error_detail": "page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://p9arena.linkcourt.app/reserve\", waiting until \"domcontentloaded\"\n",
+  "checked_at": "2026-11-19T13:45:38.053Z"
 }
