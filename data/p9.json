@@ -1,6 +1,6 @@
 {
-  "ok": false,
-  "updated_at": "2026-11-19T13:33:50.997Z",
+  "ok": true,
+  "updated_at": "2026-11-19T14:04:35.544Z",
   "dates": [
     "2026-11-19",
     "2026-11-20",
@@ -296,10 +296,6 @@
           {
             "t": "09:00",
             "price": 580
-          },
-          {
-            "t": "15:00",
-            "price": 680
           },
           {
             "t": "16:00",
@@ -1876,8 +1872,5 @@
         ]
       }
     }
-  ],
-  "error": "error",
-  "error_detail": "page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://p9arena.linkcourt.app/reserve\", waiting until \"domcontentloaded\"\n",
-  "checked_at": "2026-11-19T13:45:38.053Z"
+  ]
 }
