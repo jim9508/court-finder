@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updated_at": "2026-11-22T14:24:39.417Z",
+  "updated_at": "2026-11-22T15:00:20.154Z",
   "dates": [
     "2026-11-22",
     "2026-11-23",
@@ -20,8 +20,26 @@
   "courts": [
     {
       "name": "1號場",
-      "url": "https://p9arena.linkcourt.app/reserve?date=2026-11-23",
+      "url": "https://p9arena.linkcourt.app/reserve?date=2026-11-22",
       "days": {
+        "2026-11-22": [
+          {
+            "t": "06:00",
+            "price": 680
+          },
+          {
+            "t": "07:00",
+            "price": 680
+          },
+          {
+            "t": "08:00",
+            "price": 880
+          },
+          {
+            "t": "23:00",
+            "price": 680
+          }
+        ],
         "2026-11-23": [
           {
             "t": "06:00",
@@ -611,8 +629,38 @@
     },
     {
       "name": "2號場",
-      "url": "https://p9arena.linkcourt.app/reserve?date=2026-11-23",
+      "url": "https://p9arena.linkcourt.app/reserve?date=2026-11-22",
       "days": {
+        "2026-11-22": [
+          {
+            "t": "06:00",
+            "price": 680
+          },
+          {
+            "t": "07:00",
+            "price": 680
+          },
+          {
+            "t": "08:00",
+            "price": 880
+          },
+          {
+            "t": "09:00",
+            "price": 880
+          },
+          {
+            "t": "12:00",
+            "price": 880
+          },
+          {
+            "t": "17:00",
+            "price": 880
+          },
+          {
+            "t": "23:00",
+            "price": 680
+          }
+        ],
         "2026-11-23": [
           {
             "t": "06:00",
@@ -1202,8 +1250,26 @@
     },
     {
       "name": "3號場",
-      "url": "https://p9arena.linkcourt.app/reserve?date=2026-11-23",
+      "url": "https://p9arena.linkcourt.app/reserve?date=2026-11-22",
       "days": {
+        "2026-11-22": [
+          {
+            "t": "06:00",
+            "price": 680
+          },
+          {
+            "t": "07:00",
+            "price": 680
+          },
+          {
+            "t": "08:00",
+            "price": 880
+          },
+          {
+            "t": "23:00",
+            "price": 680
+          }
+        ],
         "2026-11-23": [
           {
             "t": "06:00",
