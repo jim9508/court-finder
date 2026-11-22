@@ -1,5 +1,5 @@
 {
-  "ok": true,
+  "ok": false,
   "updated_at": "2026-11-22T15:00:20.154Z",
   "dates": [
     "2026-11-22",
@@ -1917,5 +1917,8 @@
         ]
       }
     }
-  ]
+  ],
+  "error": "needs_login",
+  "error_detail": "60 秒內沒拿到 token（最後在 linkcourt.app）",
+  "checked_at": "2026-11-22T18:14:42.199Z"
 }
