@@ -1919,6 +1919,6 @@
     }
   ],
   "error": "needs_login",
-  "error_detail": "60 秒內沒拿到 token（最後在 p9arena.linkcourt.app）",
-  "checked_at": "2026-11-23T00:17:08.699Z"
+  "error_detail": "60 秒內沒拿到 token（最後在 linkcourt.app）",
+  "checked_at": "2026-11-23T03:16:31.092Z"
 }
